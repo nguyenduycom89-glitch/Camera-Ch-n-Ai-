@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò Chơi Tương Tác AI - Lớp Học</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { overflow: hidden; background: linear-gradient(to bottom, #87CEEB 53%, #6B9E34 53%); height: 100vh; width: 100vw; }
+        
+        .sun { position: absolute; top: 40px; left: 40px; width: 120px; height: 120px; background-color: #FFD700; border-radius: 50%; box-shadow: 0 0 40px #FF8C00; cursor: pointer; transition: 0.2s; z-index: 100;}
+        .sun:hover { transform: scale(1.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; position: relative; z-index: 100; }
+        
+        /* Cụm nút bấm góc trái */
+        .controls { display: flex; gap: 15px; align-items: center;}
+        .settings-btn { background: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.2s; display: flex; justify-content: center; align-items: center; }
+        .settings-btn:hover { transform: scale(1.1); background: #f0f0f0; }
+        
+        .status-badge { background-color: #4682B4; color: #FFD700; padding: 10px 30px; border-radius: 30px; font-size: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.3s; }
+        
+        #game-area { position: absolute; top: 100px; left: 0; width: 100vw; height: calc(100vh - 100px); overflow: hidden; }
+        .student-node { position: absolute; display: flex; flex-direction: column; align-items: center; width: 100px; transition: transform 0.1s linear, box-shadow 0.3s; z-index: 10; cursor: pointer; }
+        .student-node img { width: 70px; height: 70px; background-color: rgba(255,255,255,0.8); border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.3); pointer-events: none; }
+        .student-node .name { background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-top: 5px; text-align: center; white-space: nowrap; pointer-events: none; }
+        
+        .student-node.selected { z-index: 999 !important; }
+        .student-node.selected img { border-color: #FFD700; background-color: #fff; box-shadow: 0 0 30px #FFD700; }
+        .student-node.selected .name { background: #FFD700; color: #000; font-weight: bold; font-size: 16px; }
+
+        .camera-container { position: absolute; bottom: 20px; right: 20px; width: 280px; height: 210px; background: black; border: 3px solid white; border-radius: 10px; overflow: hidden; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        #webcam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+        #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .ai-status { position: absolute; bottom: 5px; right: 10px; color: #00FF00; font-size: 14px; font-weight: bold; text-shadow: 2px 2px 4px black; z-index: 1001;}
+
+        /* Modal Cài đặt */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { margin-bottom: 10px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #444;}
+        .form-group textarea { width: 100%; height: 150px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: Tahoma, sans-serif; font-size: 15px; }
+        
+        /* Upload file input styling */
+        .file-upload-wrapper { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px dashed #bbb; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;}
+        .file-upload-wrapper input[type="file"] { font-size: 14px; }
+        
+        .btn-save { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; float: right; }
+        .btn-close { background: #f44336; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; float: right; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+    <audio id="bgMusic" loop preload="auto">
+        <source src="nhacnen.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="sun" onclick="triggerSelection(1)" title="Bấm vào đây để gọi ngẫu nhiên 1 em"></div>
+    
+    <div class="header">
+        <div class="controls">
+            <button class="settings-btn" onclick="openSettings()" title="Cài đặt danh sách & Nhạc">⚙️</button>
+            <button class="settings-btn" id="musicBtn" onclick="toggleMusic()" title="Bật/Tắt nhạc">🔇</button>
+        </div>
+        <div class="status-badge" id="statusText">Giơ ngón tay vào Camera để chọn học sinh!</div>
+        <div style="flex: 1;"></div>
+    </div>
+
+    <div id="game-area"></div>
+
+    <div class="camera-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas"></canvas>
+        <div class="ai-status" id="ai-status">Đang tải AI...</div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <h2>Cài đặt Trò chơi</h2>
+            
+            <div class="form-group file-upload-wrapper">
+                <label>🎵 Chọn file nhạc nền (nếu có):</label>
+                <input type="file" id="musicUpload" accept="audio/mp3, audio/wav, audio/*">
+                <span id="musicStatus" style="color: green; font-size: 13px; font-weight: bold; display: none;">Đã tải nhạc lên!</span>
+            </div>
+
+            <div class="form-group">
+                <label>📋 Danh sách Học sinh:</label>
+                <p style="font-size: 13px; color: #d32f2f; margin-bottom: 10px; font-style: italic;">
+                    - Chỉ gõ tên: AI tự vẽ ảnh.<br>
+                    - Gõ Tên|TênFileẢnh (VD: Tùng Chi|Chi.png): Dùng ảnh thật.
+                </p>
+                <textarea id="studentsDataText" placeholder="Tùng Chi|Chi.png&#10;Bảo Ngọc|Bngoc.png&#10;Bảo Trân|BTran.png&#10;Gia Bảo"></textarea>
+            </div>
+            <div>
+                <button class="btn-save" onclick="saveSettings()">Lưu & Tải lại</button>
+                <button class="btn-close" onclick="closeSettings()">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. QUẢN LÝ NHẠC NỀN THÔNG MINH ---
+        const bgMusic = document.getElementById('bgMusic');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicUpload = document.getElementById('musicUpload');
+        const musicStatus = document.getElementById('musicStatus');
+        let isMusicPlaying = false;
+
+        // Xử lý khi thầy chọn file nhạc từ máy tính
+        musicUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Tạo một đường dẫn tạm thời tới file nhạc trong máy
+                const objectURL = URL.createObjectURL(file);
+                bgMusic.src = objectURL;
+                musicStatus.style.display = 'inline';
+                
+                // Lưu cờ vào bộ nhớ tạm để biết thầy đã tải nhạc
+                sessionStorage.setItem('hasCustomMusic', 'true');
+            }
+        });
+
+        function toggleMusic() {
+            if (isMusicPlaying) {
+                bgMusic.pause();
+                musicBtn.innerText = '🔇';
+            } else {
+                // Thử phát nhạc
+                let playPromise = bgMusic.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        musicBtn.innerText = '🔊';
+                    })
+                    .catch(error => {
+                        // Nếu file mặc định lỗi, hiện hộp thoại hướng dẫn
+                        alert("Không tìm thấy file 'nhacnen.mp3'. Thầy hãy bấm vào Cài đặt (⚙️) -> Chọn file nhạc nền từ máy tính để tải nhạc lên nhé!");
+                        isMusicPlaying = false; // Đặt lại trạng thái
+                        return;
+                    });
+                }
+            }
+            isMusicPlaying = !isMusicPlaying;
+        }
+
+        // --- 2. DỮ LIỆU HỌC SINH ---
+        const defaultStudents = ["Tùng Chi|Chi.png", "Bảo Ngọc|Bngoc.png", "Bảo Trân|BTran.png", "Gia Bảo", "Minh Khang"];
+        let students = [], studentNodes = [], isAnimating = true, isSelecting = false; 
+        
+        function loadSettings() {
+            const savedData = localStorage.getItem('classDataNamesOnly');
+            const rawData = savedData ? savedData : defaultStudents.join('\n');
+
+            students = rawData.split('\n').filter(line => line.trim() !== '').map(line => {
+                let parts = line.split('|');
+                let cleanName = parts[0].trim();
+                let imgUrl = parts[1] ? parts[1].trim() : `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(cleanName)}`;
+                return { name: cleanName, img: imgUrl };
+            });
+
+            document.getElementById('studentsDataText').value = rawData;
+            initGameArea();
+        }
+
+        function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+        function saveSettings() {
+            localStorage.setItem('classDataNamesOnly', document.getElementById('studentsDataText').value);
+            // Chúng ta không reload ngay nếu đang tải nhạc để giữ file nhạc không bị mất
+            if(musicUpload.files.length > 0) {
+                document.getElementById('settingsModal').style.display = 'none';
+                initGameArea(); // Chỉ vẽ lại học sinh
+                toggleMusic();  // Tự bật nhạc luôn
+            } else {
+                location.reload(); 
+            }
+        }
+
+        // --- 3. KHU VỰC TRÒ CHƠI ---
+        const gameArea = document.getElementById('game-area');
+        
+        function initGameArea() {
+            gameArea.innerHTML = '';
+            studentNodes = [];
+            const areaWidth = gameArea.clientWidth;
+            const areaHeight = gameArea.clientHeight;
+
+            students.forEach((std) => {
+                let el = document.createElement('div');
+                el.className = 'student-node';
+                el.innerHTML = `<img src="${std.img}" alt="HS" onerror="this.src='https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(std.name)}'"><div class="name">${std.name}</div>`;
+                gameArea.appendChild(el);
+
+                let speedX = (Math.random() - 0.5) * 6;
+                let speedY = (Math.random() - 0.5) * 6;
+                if(Math.abs(speedX) < 2) speedX = speedX < 0 ? -2 : 2;
+                if(Math.abs(speedY) < 2) speedY = speedY < 0 ? -2 : 2;
+
+                let nodeObj = {
+                    element: el, x: Math.random() * (areaWidth - 100), y: Math.random() * (areaHeight - 100),
+                    vx: speedX, vy: speedY, wobble: Math.random() * Math.PI * 2, selected: false
+                };
+                studentNodes.push(nodeObj);
+            });
+            if(!document.animationStarted) {
+                requestAnimationFrame(animateStudents);
+                document.animationStarted = true;
+            }
+        }
+
+        function animateStudents() {
+            if(!isAnimating) return;
+            const areaWidth = gameArea.clientWidth;
+            const areaHeight = gameArea.clientHeight;
+
+            studentNodes.forEach(node => {
+                if(!node.selected) {
+                    node.x += node.vx; node.y += node.vy; node.wobble += 0.1;
+                    if(node.x <= 0 || node.x >= areaWidth - 100) node.vx *= -1;
+                    if(node.y <= 0 || node.y >= areaHeight - 100) node.vy *= -1;
+                    let rotationAngle = Math.sin(node.wobble) * 15; 
+                    node.element.style.transform = `translate(${node.x}px, ${node.y}px) rotate(${rotationAngle}deg) scale(1)`;
+                }
+            });
+            requestAnimationFrame(animateStudents);
+        }
+
+        // --- 4. CAMERA VÀ NHẬN DIỆN AI ---
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusText = document.getElementById('statusText');
+        const aiStatus = document.getElementById('ai-status');
+
+        let stableFrames = 0;
+        let lastFingerCount = 0;
+
+        function countFingers(landmarks) {
+            let count = 0;
+            if (landmarks[8].y < landmarks[6].y) count++;  
+            if (landmarks[12].y < landmarks[10].y) count++; 
+            if (landmarks[16].y < landmarks[14].y) count++; 
+            if (landmarks[20].y < landmarks[18].y) count++; 
+            let thumbTipDist = Math.abs(landmarks[4].x - landmarks[9].x);
+            let thumbBaseDist = Math.abs(landmarks[3].x - landmarks[9].x);
+            if (thumbTipDist > thumbBaseDist + 0.03 && landmarks[4].y < landmarks[0].y) count++; 
+            return count;
+        }
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (isSelecting) {
+                aiStatus.innerText = "Đang khóa AI hiển thị...";
+                canvasCtx.restore();
+                return;
+            }
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                let landmarks = results.multiHandLandmarks[0];
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
+                drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1});
+
+                let fingerCount = countFingers(landmarks);
+                aiStatus.innerText = `Đang giơ: ${fingerCount} ngón`;
+
+                if(fingerCount > 0 && fingerCount <= 5) {
+                    if(fingerCount === lastFingerCount) {
+                        stableFrames++;
+                        if(stableFrames === 25) { 
+                            triggerSelection(fingerCount);
+                            stableFrames = 0;
+                        }
+                    } else {
+                        lastFingerCount = fingerCount;
+                        stableFrames = 0;
+                    }
+                } else {
+                    stableFrames = 0;
+                }
+            } else {
+                aiStatus.innerText = "AI Sẵn sàng! (Chưa thấy tay)";
+                stableFrames = 0;
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 320, height: 240
+        });
+        camera.start();
+
+        // --- 5. LOGIC GỌI TÊN HỌC SINH ---
+        function triggerSelection(count) {
+            isSelecting = true; 
+            statusText.innerText = `Đã chọn ${count} học sinh!`;
+            statusText.style.backgroundColor = "#FF4500";
+            
+            studentNodes.forEach(node => {
+                node.selected = false;
+                node.element.classList.remove('selected');
+            });
+
+            let shuffled = [...studentNodes].sort(() => 0.5 - Math.random());
+            let selectedNodes = shuffled.slice(0, count);
+
+            const areaWidth = gameArea.clientWidth;
+            const areaHeight = gameArea.clientHeight;
+            const startX = (areaWidth - (count * 120)) / 2;
+
+            selectedNodes.forEach((node, index) => {
+                node.selected = true;
+                node.element.classList.add('selected');
+                node.x = startX + (index * 120);
+                node.y = areaHeight / 2 - 50;
+                node.element.style.transform = `translate(${node.x}px, ${node.y}px) rotate(0deg) scale(1.5)`;
+            });
+
+            setTimeout(() => {
+                statusText.innerText = "Giơ ngón tay vào Camera để chọn học sinh!";
+                statusText.style.backgroundColor = "#4682B4";
+                selectedNodes.forEach(node => {
+                    node.selected = false;
+                    node.element.classList.remove('selected');
+                });
+                
+                setTimeout(() => {
+                    isSelecting = false;
+                    lastFingerCount = 0;
+                }, 500);
+
+            }, 6000); 
+        }
+
+        window.onload = loadSettings;
+    </script>
+</body>
+</html>
