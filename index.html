@@ -3,68 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trò Chơi Tương Tác AI - Lớp Học</title>
+    <title>Trò Chơi Tương Tác AI & Ôn Tập Trắc Nghiệm</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { overflow: hidden; background: linear-gradient(to bottom, #87CEEB 53%, #6B9E34 53%); height: 100vh; width: 100vw; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { overflow: hidden; background: linear-gradient(to bottom, #87CEEB 53%, #6B9E34 53%); height: 100vh; width: 100vw; position: relative;}
         
         .sun { position: absolute; top: 40px; left: 40px; width: 120px; height: 120px; background-color: #FFD700; border-radius: 50%; box-shadow: 0 0 40px #FF8C00; cursor: pointer; transition: 0.2s; z-index: 100;}
         .sun:hover { transform: scale(1.1); }
         .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; position: relative; z-index: 100; }
         
-        /* Cụm nút bấm góc trái */
+        /* Cụm nút điều khiển chính */
         .controls { display: flex; gap: 15px; align-items: center;}
-        .settings-btn { background: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.2s; display: flex; justify-content: center; align-items: center; }
-        .settings-btn:hover { transform: scale(1.1); background: #f0f0f0; }
+        .btn-icon { background: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 24px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.2s; display: flex; justify-content: center; align-items: center; }
+        .btn-icon:hover { transform: scale(1.1); background: #f0f0f0; }
         
-        .status-badge { background-color: #4682B4; color: #FFD700; padding: 10px 30px; border-radius: 30px; font-size: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.3s; }
+        .btn-feature { background: #FF6347; color: white; border: none; padding: 12px 25px; border-radius: 30px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; display: flex; align-items: center; gap: 8px;}
+        .btn-feature:hover { transform: scale(1.05); background: #FF4500; }
+
+        .status-badge { background-color: #4682B4; color: #FFD700; padding: 12px 35px; border-radius: 30px; font-size: 22px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.3s; }
         
+        /* Khu vực hiển thị học sinh bay lượn */
         #game-area { position: absolute; top: 100px; left: 0; width: 100vw; height: calc(100vh - 100px); overflow: hidden; }
-        .student-node { position: absolute; display: flex; flex-direction: column; align-items: center; width: 100px; transition: transform 0.1s linear, box-shadow 0.3s; z-index: 10; cursor: pointer; }
-        .student-node img { width: 70px; height: 70px; background-color: rgba(255,255,255,0.8); border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.3); pointer-events: none; }
-        .student-node .name { background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-top: 5px; text-align: center; white-space: nowrap; pointer-events: none; }
+        .student-node { position: absolute; display: flex; flex-direction: column; align-items: center; width: 100px; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s; z-index: 10; cursor: pointer; }
+        .student-node img { width: 75px; height: 75px; background-color: rgba(255,255,255,0.9); border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.3); pointer-events: none; }
+        .student-node .name { background: rgba(0,0,0,0.7); color: white; padding: 4px 10px; border-radius: 12px; font-size: 14px; font-weight: bold; margin-top: 5px; text-align: center; white-space: nowrap; pointer-events: none; }
         
         .student-node.selected { z-index: 999 !important; }
-        .student-node.selected img { border-color: #FFD700; background-color: #fff; box-shadow: 0 0 30px #FFD700; }
-        .student-node.selected .name { background: #FFD700; color: #000; font-weight: bold; font-size: 16px; }
+        .student-node.selected img { border-color: #FFD700; background-color: #fff; box-shadow: 0 0 40px #FFD700; transform: scale(1.2); transition: 0.3s;}
+        .student-node.selected .name { background: #FFD700; color: #000; font-size: 18px; transform: scale(1.2); transition: 0.3s; margin-top: 15px;}
 
-        .camera-container { position: absolute; bottom: 20px; right: 20px; width: 280px; height: 210px; background: black; border: 3px solid white; border-radius: 10px; overflow: hidden; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-        #webcam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
-        #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        /* Camera AI */
+        .camera-container { position: absolute; bottom: 40px; right: 20px; width: 260px; height: 195px; background: black; border: 4px solid white; border-radius: 12px; overflow: hidden; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        #webcam, #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         .ai-status { position: absolute; bottom: 5px; right: 10px; color: #00FF00; font-size: 14px; font-weight: bold; text-shadow: 2px 2px 4px black; z-index: 1001;}
 
-        /* Modal Cài đặt */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
-        .modal h2 { margin-bottom: 10px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+        /* Modal Dùng chung (Cài đặt, Câu hỏi) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px);}
+        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 750px; max-width: 95%; max-height: 95vh; overflow-y: auto; box-shadow: 0 15px 30px rgba(0,0,0,0.5); position: relative;}
+        .modal h2 { margin-bottom: 15px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; text-align: center; font-size: 24px;}
+        
+        /* Giao diện Câu Hỏi Trắc Nghiệm */
+        #question-display { font-size: 22px; font-weight: bold; color: #1E90FF; margin-bottom: 25px; text-align: center; line-height: 1.5;}
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .option-btn { background: #fff; border: 2px solid #ced4da; padding: 15px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; text-align: left; color: #495057; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+        .option-btn:hover { background: #f8f9fa; border-color: #adb5bd; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .option-btn.correct { background: #d4edda; border-color: #28a745; color: #155724; box-shadow: 0 0 15px rgba(40, 167, 69, 0.5);}
+        .option-btn.wrong { background: #f8d7da; border-color: #dc3545; color: #721c24; box-shadow: 0 0 15px rgba(220, 53, 69, 0.5);}
+        
+        /* Form Cài đặt */
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #444;}
-        .form-group textarea { width: 100%; height: 150px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: Tahoma, sans-serif; font-size: 15px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: bold; color: #444; font-size: 15px;}
+        .form-group textarea { width: 100%; height: 160px; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-family: monospace; font-size: 14px; resize: vertical;}
+        .file-upload-wrapper { background: #f0f8ff; padding: 10px 15px; border-radius: 8px; border: 1px dashed #4682B4; display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;}
+        .file-upload-wrapper input { font-size: 13px; }
         
-        /* Upload file input styling */
-        .file-upload-wrapper { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px dashed #bbb; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;}
-        .file-upload-wrapper input[type="file"] { font-size: 14px; }
-        
-        .btn-save { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; float: right; }
-        .btn-close { background: #f44336; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; float: right; margin-right: 10px; }
+        .btn-save { background: #4CAF50; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; float: right; margin-left: 10px;}
+        .btn-close { background: #6c757d; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; float: right; }
+        .close-x { position: absolute; top: 15px; right: 20px; font-size: 28px; cursor: pointer; color: #aaa; transition: 0.2s;}
+        .close-x:hover { color: #f44336; }
+
+        /* Chữ ký chân trang */
+        .footer-credit { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.85); font-size: 15px; font-style: italic; z-index: 100; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); pointer-events: none; font-weight: 500;}
+
+        /* Logo Canva góc trái dưới xoay vòng */
+        .canva-logo-spin {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #00C4CC, #8A2BE2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: 900;
+            font-size: 16px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            z-index: 1005;
+            animation: spin 6s linear infinite;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            user-select: none;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
 
-    <audio id="bgMusic" loop preload="auto">
-        <source src="nhacnen.mp3" type="audio/mpeg">
-    </audio>
+    <!-- THẺ AUDIO -->
+    <audio id="bgMusic" loop preload="auto"><source src="nhacnen.mp3" type="audio/mpeg"></audio>
+    <audio id="correctSound" preload="auto"></audio>
+    <audio id="wrongSound" preload="auto"></audio>
 
     <div class="sun" onclick="triggerSelection(1)" title="Bấm vào đây để gọi ngẫu nhiên 1 em"></div>
     
     <div class="header">
         <div class="controls">
-            <button class="settings-btn" onclick="openSettings()" title="Cài đặt danh sách & Nhạc">⚙️</button>
-            <button class="settings-btn" id="musicBtn" onclick="toggleMusic()" title="Bật/Tắt nhạc">🔇</button>
+            <button class="btn-icon" onclick="openSettings()" title="Cài đặt (Học sinh, Câu hỏi, Nhạc)">⚙️</button>
+            <button class="btn-icon" onclick="resetStudents()" title="Làm mới lại toàn bộ danh sách lớp">🔄</button>
+            <button class="btn-icon" id="musicBtn" onclick="toggleMusic()" title="Bật/Tắt nhạc nền">🔇</button>
+            <button class="btn-feature" style="background: #20b2aa;" onclick="showRandomQuestion()">📝 Ôn Tập Trắc Nghiệm</button>
         </div>
         <div class="status-badge" id="statusText">Giơ ngón tay vào Camera để chọn học sinh!</div>
         <div style="flex: 1;"></div>
@@ -78,109 +125,233 @@
         <div class="ai-status" id="ai-status">Đang tải AI...</div>
     </div>
 
+    <!-- Logo Canva xoay vòng -->
+    <div class="canva-logo-spin">Canva</div>
+
+    <div class="footer-credit"><i>"Ứng dụng được thiết kế trên nền tảng Gemini/Canva" được tạo bởi thầy Nguyễn Đức Duy</i></div>
+
+    <!-- MODAL CÀI ĐẶT -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
-            <h2>Cài đặt Trò chơi</h2>
+            <span class="close-x" onclick="closeModal('settingsModal')">✖</span>
+            <h2>Cài đặt Trò chơi & Dữ liệu</h2>
             
-            <div class="form-group file-upload-wrapper">
-                <label>🎵 Chọn file nhạc nền (nếu có):</label>
-                <input type="file" id="musicUpload" accept="audio/mp3, audio/wav, audio/*">
-                <span id="musicStatus" style="color: green; font-size: 13px; font-weight: bold; display: none;">Đã tải nhạc lên!</span>
+            <div style="display: flex; gap: 20px;">
+                <!-- Cột trái: Học sinh & Âm thanh -->
+                <div style="flex: 1;">
+                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 15px; background: #fafafa;">
+                        <h3 style="font-size: 15px; margin-bottom: 10px; color: #555;">🎵 Cài đặt Âm thanh</h3>
+                        <div class="file-upload-wrapper">
+                            <label>Nhạc nền (Chạy xuyên suốt):</label>
+                            <input type="file" id="musicUpload" accept="audio/*">
+                        </div>
+                        <div class="file-upload-wrapper">
+                            <label>✔️ Âm thanh báo ĐÚNG:</label>
+                            <input type="file" id="correctUpload" accept="audio/*">
+                        </div>
+                        <div class="file-upload-wrapper">
+                            <label>❌ Âm thanh báo SAI:</label>
+                            <input type="file" id="wrongUpload" accept="audio/*">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📋 Danh sách Học sinh (Tên | TênFileẢnh):</label>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 5px;">- Chỉ gõ tên: AI tự vẽ ảnh.<br>- Gõ Tên|TênFileẢnh: Dùng ảnh thật.</p>
+                        <textarea id="studentsDataText" placeholder="Tùng Chi|Chi.png.png&#10;Bảo Ngọc|Bngoc.png.png"></textarea>
+                    </div>
+                </div>
+
+                <!-- Cột phải: Ngân hàng câu hỏi -->
+                <div style="flex: 1;">
+                    <div class="form-group">
+                        <label>📚 Ngân hàng Câu hỏi Trắc nghiệm:</label>
+                        <p style="font-size: 12px; color: #d32f2f; margin-bottom: 5px;">*Copy dán theo đúng cấu trúc mẫu bên dưới (Viết hoa A,B,C,D và Đáp án).</p>
+                        <textarea id="questionsDataText" style="height: 480px; background: #fffdf2;"></textarea>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>📋 Danh sách Học sinh:</label>
-                <p style="font-size: 13px; color: #d32f2f; margin-bottom: 10px; font-style: italic;">
-                    - Chỉ gõ tên: AI tự vẽ ảnh.<br>
-                    - Gõ Tên|TênFileẢnh (VD: Tùng Chi|Chi.png): Dùng ảnh thật.
-                </p>
-                <textarea id="studentsDataText" placeholder="Tùng Chi|Chi.png&#10;Bảo Ngọc|Bngoc.png&#10;Bảo Trân|BTran.png&#10;Gia Bảo"></textarea>
+            <div style="margin-top: 10px;">
+                <button class="btn-save" onclick="saveSettings()">💾 Lưu & Áp Dụng</button>
+                <button class="btn-close" onclick="closeModal('settingsModal')">Hủy</button>
             </div>
-            <div>
-                <button class="btn-save" onclick="saveSettings()">Lưu & Tải lại</button>
-                <button class="btn-close" onclick="closeSettings()">Hủy</button>
+        </div>
+    </div>
+
+    <!-- MODAL CÂU HỎI TRẮC NGHIỆM -->
+    <div class="modal" id="questionModal">
+        <div class="modal-content" style="width: 800px; padding: 40px;">
+            <span class="close-x" onclick="closeModal('questionModal')">✖</span>
+            <h2 style="color: #4682B4; font-size: 28px; margin-bottom: 25px;">Phần Thi Trắc Nghiệm</h2>
+            <div id="question-display">Đang tải câu hỏi...</div>
+            <div class="options-grid" id="options-container">
+                <!-- Nút đáp án tự sinh ra -->
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="btn-feature" style="display: inline-flex; margin: 0 auto; background: #20b2aa; padding: 15px 30px; font-size: 20px;" onclick="showRandomQuestion()">Chuyển Câu Khác ⏭</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 1. QUẢN LÝ NHẠC NỀN THÔNG MINH ---
+        // --- QUẢN LÝ MODAL ---
+        function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- QUẢN LÝ ÂM THANH (NHẠC NỀN & HIỆU ỨNG) ---
         const bgMusic = document.getElementById('bgMusic');
+        const correctSound = document.getElementById('correctSound');
+        const wrongSound = document.getElementById('wrongSound');
         const musicBtn = document.getElementById('musicBtn');
-        const musicUpload = document.getElementById('musicUpload');
-        const musicStatus = document.getElementById('musicStatus');
         let isMusicPlaying = false;
 
-        // Xử lý khi thầy chọn file nhạc từ máy tính
-        musicUpload.addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                // Tạo một đường dẫn tạm thời tới file nhạc trong máy
-                const objectURL = URL.createObjectURL(file);
-                bgMusic.src = objectURL;
-                musicStatus.style.display = 'inline';
-                
-                // Lưu cờ vào bộ nhớ tạm để biết thầy đã tải nhạc
-                sessionStorage.setItem('hasCustomMusic', 'true');
-            }
+        document.getElementById('musicUpload').addEventListener('change', function(event) {
+            if (event.target.files[0]) bgMusic.src = URL.createObjectURL(event.target.files[0]);
+        });
+        document.getElementById('correctUpload').addEventListener('change', function(event) {
+            if (event.target.files[0]) correctSound.src = URL.createObjectURL(event.target.files[0]);
+        });
+        document.getElementById('wrongUpload').addEventListener('change', function(event) {
+            if (event.target.files[0]) wrongSound.src = URL.createObjectURL(event.target.files[0]);
         });
 
         function toggleMusic() {
-            if (isMusicPlaying) {
-                bgMusic.pause();
-                musicBtn.innerText = '🔇';
-            } else {
-                // Thử phát nhạc
-                let playPromise = bgMusic.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(_ => {
-                        musicBtn.innerText = '🔊';
-                    })
-                    .catch(error => {
-                        // Nếu file mặc định lỗi, hiện hộp thoại hướng dẫn
-                        alert("Không tìm thấy file 'nhacnen.mp3'. Thầy hãy bấm vào Cài đặt (⚙️) -> Chọn file nhạc nền từ máy tính để tải nhạc lên nhé!");
-                        isMusicPlaying = false; // Đặt lại trạng thái
-                        return;
-                    });
-                }
+            if (isMusicPlaying) { bgMusic.pause(); musicBtn.innerText = '🔇'; } 
+            else {
+                bgMusic.play().then(() => { musicBtn.innerText = '🔊'; })
+                .catch(() => { alert("Chưa có nhạc nền! Hãy vào Cài đặt (⚙️) tải nhạc nền lên nhé."); isMusicPlaying = false; });
             }
             isMusicPlaying = !isMusicPlaying;
         }
 
-        // --- 2. DỮ LIỆU HỌC SINH ---
-        const defaultStudents = ["Tùng Chi|Chi.png", "Bảo Ngọc|Bngoc.png", "Bảo Trân|BTran.png", "Gia Bảo", "Minh Khang"];
+        // --- HỆ THỐNG CÂU HỎI TRẮC NGHIỆM ---
+        const defaultQuestions = `Câu 1: Số gồm 5 trăm nghìn, 3 chục nghìn, 2 đơn vị viết là gì? (Toán 4)
+A. 503 002
+B. 530 002
+C. 53 002
+D. 500 302
+Đáp án: B
+
+Câu 2: Từ nào sau đây là từ láy? (Tiếng Việt 4)
+A. Sách vở
+B. Xe đạp
+C. Mát mẻ
+D. Hoa hồng
+Đáp án: C
+
+Câu 3: Quá trình thực vật tự tạo ra chất dinh dưỡng gọi là gì? (Khoa học 4)
+A. Hô hấp
+B. Thoát hơi nước
+C. Bài tiết
+D. Quang hợp
+Đáp án: D`;
+
+        let questionBank = [];
+        let currentCorrectAnswer = "";
+
+        function parseQuestions(text) {
+            let parsedList = [];
+            let blocks = text.split(/\n\s*\n/); 
+            blocks.forEach(block => {
+                let lines = block.split('\n').filter(l => l.trim() !== '');
+                if(lines.length >= 6) {
+                    let q = lines[0]; 
+                    let opts = [lines[1], lines[2], lines[3], lines[4]]; 
+                    let ansLine = lines[5].toUpperCase();
+                    let ans = "A";
+                    if(ansLine.includes("B")) ans = "B";
+                    if(ansLine.includes("C")) ans = "C";
+                    if(ansLine.includes("D")) ans = "D";
+                    parsedList.push({ question: q, options: opts, answer: ans });
+                }
+            });
+            return parsedList;
+        }
+
+        function showRandomQuestion() {
+            if(questionBank.length === 0) {
+                alert("Ngân hàng câu hỏi trống! Vui lòng vào Cài đặt để thêm câu hỏi.");
+                return;
+            }
+            let randomIndex = Math.floor(Math.random() * questionBank.length);
+            let qData = questionBank[randomIndex];
+            currentCorrectAnswer = qData.answer;
+
+            document.getElementById('question-display').innerText = qData.question;
+            let optionsHtml = '';
+            
+            const labels = ['A', 'B', 'C', 'D'];
+            qData.options.forEach((optText, index) => {
+                let label = labels[index];
+                optionsHtml += `<button class="option-btn" onclick="checkAnswer(this, '${label}')"><b>${label}.</b> ${optText.replace(/^[A-D]\.\s*/, '')}</button>`;
+            });
+
+            document.getElementById('options-container').innerHTML = optionsHtml;
+            document.getElementById('questionModal').style.display = 'flex';
+        }
+
+        function checkAnswer(btnElement, selectedOption) {
+            let allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(btn => btn.disabled = true);
+
+            if(selectedOption === currentCorrectAnswer) {
+                btnElement.classList.add('correct');
+                correctSound.currentTime = 0; 
+                correctSound.play().catch(e => console.log("Chưa tải âm thanh đúng"));
+            } else {
+                btnElement.classList.add('wrong');
+                wrongSound.currentTime = 0;
+                wrongSound.play().catch(e => console.log("Chưa tải âm thanh sai"));
+                
+                let correctIndex = ['A', 'B', 'C', 'D'].indexOf(currentCorrectAnswer);
+                if(correctIndex >= 0 && correctIndex < allBtns.length) {
+                    allBtns[correctIndex].classList.add('correct');
+                }
+            }
+        }
+
+        // --- DỮ LIỆU HỌC SINH VÀ CÀI ĐẶT ---
+        const defaultStudents = ["Tùng Chi|Chi.png.png", "Bảo Ngọc|Bngoc.png.png", "Bảo Trân|BTran.png.png", "Gia Bảo", "Minh Khang", "Tuấn Kiệt"];
         let students = [], studentNodes = [], isAnimating = true, isSelecting = false; 
         
         function loadSettings() {
             const savedData = localStorage.getItem('classDataNamesOnly');
             const rawData = savedData ? savedData : defaultStudents.join('\n');
-
             students = rawData.split('\n').filter(line => line.trim() !== '').map(line => {
                 let parts = line.split('|');
                 let cleanName = parts[0].trim();
                 let imgUrl = parts[1] ? parts[1].trim() : `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(cleanName)}`;
                 return { name: cleanName, img: imgUrl };
             });
-
             document.getElementById('studentsDataText').value = rawData;
+
+            const savedQuestions = localStorage.getItem('questionBankData');
+            const rawQuestions = savedQuestions ? savedQuestions : defaultQuestions;
+            document.getElementById('questionsDataText').value = rawQuestions;
+            questionBank = parseQuestions(rawQuestions);
+
             initGameArea();
         }
 
-        function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
-        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
         function saveSettings() {
             localStorage.setItem('classDataNamesOnly', document.getElementById('studentsDataText').value);
-            // Chúng ta không reload ngay nếu đang tải nhạc để giữ file nhạc không bị mất
-            if(musicUpload.files.length > 0) {
-                document.getElementById('settingsModal').style.display = 'none';
-                initGameArea(); // Chỉ vẽ lại học sinh
-                toggleMusic();  // Tự bật nhạc luôn
-            } else {
-                location.reload(); 
-            }
+            localStorage.setItem('questionBankData', document.getElementById('questionsDataText').value);
+            
+            closeModal('settingsModal');
+            loadSettings(); 
         }
 
-        // --- 3. KHU VỰC TRÒ CHƠI ---
+        // --- LÀM MỚI LẠI LỚP (Nút 🔄) ---
+        function resetStudents() {
+            isSelecting = false;
+            lastFingerCount = 0;
+            document.getElementById('statusText').innerText = "Giơ ngón tay vào Camera để chọn học sinh!";
+            document.getElementById('statusText').style.backgroundColor = "#4682B4";
+            initGameArea();
+        }
+
+        // --- KHU VỰC TRÒ CHƠI & CHUYỂN ĐỘNG ---
         const gameArea = document.getElementById('game-area');
         
         function initGameArea() {
@@ -195,10 +366,10 @@
                 el.innerHTML = `<img src="${std.img}" alt="HS" onerror="this.src='https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(std.name)}'"><div class="name">${std.name}</div>`;
                 gameArea.appendChild(el);
 
-                let speedX = (Math.random() - 0.5) * 6;
-                let speedY = (Math.random() - 0.5) * 6;
-                if(Math.abs(speedX) < 2) speedX = speedX < 0 ? -2 : 2;
-                if(Math.abs(speedY) < 2) speedY = speedY < 0 ? -2 : 2;
+                let speedX = (Math.random() - 0.5) * 5;
+                let speedY = (Math.random() - 0.5) * 5;
+                if(Math.abs(speedX) < 1.5) speedX = speedX < 0 ? -1.5 : 1.5;
+                if(Math.abs(speedY) < 1.5) speedY = speedY < 0 ? -1.5 : 1.5;
 
                 let nodeObj = {
                     element: el, x: Math.random() * (areaWidth - 100), y: Math.random() * (areaHeight - 100),
@@ -219,17 +390,17 @@
 
             studentNodes.forEach(node => {
                 if(!node.selected) {
-                    node.x += node.vx; node.y += node.vy; node.wobble += 0.1;
+                    node.x += node.vx; node.y += node.vy; node.wobble += 0.08;
                     if(node.x <= 0 || node.x >= areaWidth - 100) node.vx *= -1;
                     if(node.y <= 0 || node.y >= areaHeight - 100) node.vy *= -1;
-                    let rotationAngle = Math.sin(node.wobble) * 15; 
+                    let rotationAngle = Math.sin(node.wobble) * 10; 
                     node.element.style.transform = `translate(${node.x}px, ${node.y}px) rotate(${rotationAngle}deg) scale(1)`;
                 }
             });
             requestAnimationFrame(animateStudents);
         }
 
-        // --- 4. CAMERA VÀ NHẬN DIỆN AI ---
+        // --- CAMERA VÀ NHẬN DIỆN AI ---
         const videoElement = document.getElementById('webcam');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
@@ -262,6 +433,13 @@
                 return;
             }
 
+            // Nếu hết học sinh thì không nhận diện tay nữa
+            if (studentNodes.length === 0) {
+                aiStatus.innerText = "Đã gọi hết lớp!";
+                canvasCtx.restore();
+                return;
+            }
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 let landmarks = results.multiHandLandmarks[0];
                 drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
@@ -270,11 +448,13 @@
                 let fingerCount = countFingers(landmarks);
                 aiStatus.innerText = `Đang giơ: ${fingerCount} ngón`;
 
-                if(fingerCount > 0 && fingerCount <= 5) {
+                let targetCount = Math.min(fingerCount, studentNodes.length);
+
+                if(targetCount > 0 && targetCount <= 5) {
                     if(fingerCount === lastFingerCount) {
                         stableFrames++;
-                        if(stableFrames === 25) { 
-                            triggerSelection(fingerCount);
+                        if(stableFrames === 20) { 
+                            triggerSelection(targetCount);
                             stableFrames = 0;
                         }
                     } else {
@@ -303,10 +483,19 @@
         });
         camera.start();
 
-        // --- 5. LOGIC GỌI TÊN HỌC SINH ---
+        // --- LOGIC GỌI TÊN & LOẠI DẦN HỌC SINH ---
         function triggerSelection(count) {
+            if (isSelecting) return; // Khóa lệnh nếu đang hiển thị học sinh, tránh bấm đúp
+            if (studentNodes.length === 0) {
+                alert("Đã gọi hết danh sách lớp! Vui lòng bấm nút 🔄 (Làm mới) ở góc trái để chơi lại từ đầu.");
+                return;
+            }
+
+            // Đảm bảo không gọi số lượng lớn hơn số học sinh còn lại trên màn hình
+            count = Math.min(count, studentNodes.length);
+
             isSelecting = true; 
-            statusText.innerText = `Đã chọn ${count} học sinh!`;
+            statusText.innerText = `Đã chọn ${count} học sinh lên trả lời!`;
             statusText.style.backgroundColor = "#FF4500";
             
             studentNodes.forEach(node => {
@@ -319,30 +508,40 @@
 
             const areaWidth = gameArea.clientWidth;
             const areaHeight = gameArea.clientHeight;
-            const startX = (areaWidth - (count * 120)) / 2;
+            const startX = (areaWidth - (count * 150)) / 2; 
 
             selectedNodes.forEach((node, index) => {
                 node.selected = true;
                 node.element.classList.add('selected');
-                node.x = startX + (index * 120);
-                node.y = areaHeight / 2 - 50;
-                node.element.style.transform = `translate(${node.x}px, ${node.y}px) rotate(0deg) scale(1.5)`;
+                node.x = startX + (index * 150);
+                node.y = areaHeight / 2 - 80;
+                node.element.style.transform = `translate(${node.x}px, ${node.y}px) rotate(0deg)`;
             });
 
             setTimeout(() => {
-                statusText.innerText = "Giơ ngón tay vào Camera để chọn học sinh!";
-                statusText.style.backgroundColor = "#4682B4";
                 selectedNodes.forEach(node => {
-                    node.selected = false;
-                    node.element.classList.remove('selected');
-                });
-                
-                setTimeout(() => {
-                    isSelecting = false;
-                    lastFingerCount = 0;
-                }, 500);
+                    node.element.style.opacity = '0';
+                    node.element.style.transform = `translate(${node.x}px, ${node.y}px) scale(0)`;
+                    
+                    setTimeout(() => {
+                        if(node.element.parentNode) {
+                            node.element.parentNode.removeChild(node.element);
+                        }
+                    }, 500);
 
-            }, 6000); 
+                    studentNodes = studentNodes.filter(n => n !== node);
+                });
+
+                if (studentNodes.length === 0) {
+                    statusText.innerText = "Đã gọi hết lớp! Bấm nút 🔄 để chơi lại.";
+                    statusText.style.backgroundColor = "#28a745"; 
+                } else {
+                    statusText.innerText = "Giơ ngón tay vào Camera để tiếp tục chọn!";
+                    statusText.style.backgroundColor = "#4682B4";
+                }
+                
+                setTimeout(() => { isSelecting = false; lastFingerCount = 0; }, 500);
+            }, 8000); 
         }
 
         window.onload = loadSettings;
